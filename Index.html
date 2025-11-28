@@ -8,8 +8,9 @@
     <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
     <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
     <style>
-        body { margin: 0; padding: 0; }
+        body { margin: 0; padding: 0; font-family: system-ui, -apple-system, sans-serif; }
     </style>
 </head>
 <body>
@@ -20,561 +21,531 @@
         const { PlusCircle, LogOut, Users, Clock, Award, Trash2, Shield } = lucide;
 
         function VolunteerTracker() {
-          import React, { useState, useEffect } from 'react';
-import { PlusCircle, LogOut, Users, Clock, Award, Trash2, Shield, Settings } from 'lucide-react';
+          const [currentUser, setCurrentUser] = useState(null);
+          const [users, setUsers] = useState([]);
+          const [hours, setHours] = useState(0);
+          const [description, setDescription] = useState('');
+          const [loginMode, setLoginMode] = useState(true);
+          const [username, setUsername] = useState('');
+          const [password, setPassword] = useState('');
+          const [name, setName] = useState('');
+          const [showLeaderboard, setShowLeaderboard] = useState(false);
+          const [showAdminPanel, setShowAdminPanel] = useState(false);
+          const [selectedUser, setSelectedUser] = useState(null);
+          const [adminPassword, setAdminPassword] = useState('');
+          const [isAdmin, setIsAdmin] = useState(false);
 
-export default function VolunteerTracker() {
-  const [currentUser, setCurrentUser] = useState(null);
-  const [users, setUsers] = useState([]);
-  const [hours, setHours] = useState(0);
-  const [description, setDescription] = useState('');
-  const [loginMode, setLoginMode] = useState(true);
-  const [username, setUsername] = useState('');
-  const [password, setPassword] = useState('');
-  const [name, setName] = useState('');
-  const [showLeaderboard, setShowLeaderboard] = useState(false);
-  const [showAdminPanel, setShowAdminPanel] = useState(false);
-  const [selectedUser, setSelectedUser] = useState(null);
-  const [adminPassword, setAdminPassword] = useState('');
-  const [isAdmin, setIsAdmin] = useState(false);
+          const ADMIN_PASSWORD = 'admin2024';
 
-  // ADMIN PASSWORD - Change this to whatever you want!
-  const ADMIN_PASSWORD = 'admin2024';
+          useEffect(() => {
+            loadData();
+          }, []);
 
-  useEffect(() => {
-    loadData();
-  }, []);
-
-  const loadData = async () => {
-    try {
-      const usersResult = await window.storage.get('volunteer-users');
-      if (usersResult) {
-        setUsers(JSON.parse(usersResult.value));
-      }
-    } catch (error) {
-      console.log('No existing data, starting fresh');
-    }
-  };
-
-  const saveUsers = async (updatedUsers) => {
-    try {
-      await window.storage.set('volunteer-users', JSON.stringify(updatedUsers));
-      setUsers(updatedUsers);
-    } catch (error) {
-      console.error('Error saving data:', error);
-      alert('Error saving data. Please try again.');
-    }
-  };
-
-  const handleSignup = () => {
-    if (!username || !password || !name) {
-      alert('Please fill in all fields');
-      return;
-    }
-    if (users.find(u => u.username === username)) {
-      alert('Username already exists');
-      return;
-    }
-    const newUser = {
-      username,
-      password,
-      name,
-      totalHours: 0,
-      entries: []
-    };
-    saveUsers([...users, newUser]);
-    alert('Account created! Please log in.');
-    setLoginMode(true);
-    setUsername('');
-    setPassword('');
-    setName('');
-  };
-
-  const handleLogin = () => {
-    const user = users.find(u => u.username === username && u.password === password);
-    if (user) {
-      setCurrentUser(user);
-      setUsername('');
-      setPassword('');
-    } else {
-      alert('Invalid username or password');
-    }
-  };
-
-  const handleAdminLogin = () => {
-    if (adminPassword === ADMIN_PASSWORD) {
-      setIsAdmin(true);
-      setAdminPassword('');
-      alert('Admin access granted!');
-    } else {
-      alert('Incorrect admin password');
-      setAdminPassword('');
-    }
-  };
-
-  const handleAddHours = () => {
-    if (hours <= 0) {
-      alert('Please enter a valid number of hours');
-      return;
-    }
-    if (!description) {
-      alert('Please describe how you earned these hours');
-      return;
-    }
-
-    const updatedUsers = users.map(u => {
-      if (u.username === currentUser.username) {
-        return {
-          ...u,
-          totalHours: u.totalHours + parseFloat(hours),
-          entries: [...u.entries, {
-            hours: parseFloat(hours),
-            description,
-            date: new Date().toLocaleDateString()
-          }]
-        };
-      }
-      return u;
-    });
-
-    saveUsers(updatedUsers);
-    setCurrentUser(updatedUsers.find(u => u.username === currentUser.username));
-    setHours(0);
-    setDescription('');
-    alert('Hours added successfully!');
-  };
-
-  const handleDeleteEntry = (entryIndex) => {
-    const entry = currentUser.entries[entryIndex];
-    const updatedUsers = users.map(u => {
-      if (u.username === currentUser.username) {
-        const newEntries = u.entries.filter((_, i) => i !== entryIndex);
-        return {
-          ...u,
-          totalHours: u.totalHours - entry.hours,
-          entries: newEntries
-        };
-      }
-      return u;
-    });
-    saveUsers(updatedUsers);
-    setCurrentUser(updatedUsers.find(u => u.username === currentUser.username));
-  };
-
-  const handleAdminDeleteEntry = (username, entryIndex) => {
-    const user = users.find(u => u.username === username);
-    const entry = user.entries[entryIndex];
-    
-    if (window.confirm(`Delete ${entry.hours} hours from ${user.name}?`)) {
-      const updatedUsers = users.map(u => {
-        if (u.username === username) {
-          const newEntries = u.entries.filter((_, i) => i !== entryIndex);
-          return {
-            ...u,
-            totalHours: u.totalHours - entry.hours,
-            entries: newEntries
+          const loadData = () => {
+            try {
+              const savedUsers = localStorage.getItem('volunteer-users');
+              if (savedUsers) {
+                setUsers(JSON.parse(savedUsers));
+              }
+            } catch (error) {
+              console.log('No existing data');
+            }
           };
-        }
-        return u;
-      });
-      saveUsers(updatedUsers);
-      alert('Hours removed successfully!');
-    }
-  };
 
-  const sortedUsers = [...users].sort((a, b) => {
-    if (b.totalHours !== a.totalHours) {
-      return b.totalHours - a.totalHours;
-    }
-    return a.name.localeCompare(b.name);
-  });
+          const saveUsers = (updatedUsers) => {
+            try {
+              localStorage.setItem('volunteer-users', JSON.stringify(updatedUsers));
+              setUsers(updatedUsers);
+            } catch (error) {
+              console.error('Error saving:', error);
+              alert('Error saving data');
+            }
+          };
 
-  // Admin Panel View
-  if (isAdmin && showAdminPanel) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-100 p-4">
-        <div className="max-w-6xl mx-auto">
-          <div className="bg-white rounded-2xl shadow-2xl p-6 mb-6">
-            <div className="flex justify-between items-center">
-              <div className="flex items-center gap-3">
-                <div className="bg-purple-600 p-3 rounded-full">
-                  <Shield className="text-white" size={24} />
-                </div>
-                <div>
-                  <h1 className="text-2xl font-bold text-gray-800">Admin Panel</h1>
-                  <p className="text-gray-600">Manage all student volunteer hours</p>
-                </div>
-              </div>
-              <button
-                onClick={() => {
-                  setShowAdminPanel(false);
-                  setIsAdmin(false);
-                }}
-                className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition"
-              >
-                <LogOut size={20} />
-                Exit Admin
-              </button>
-            </div>
-          </div>
+          const handleSignup = () => {
+            if (!username || !password || !name) {
+              alert('Please fill in all fields');
+              return;
+            }
+            if (users.find(u => u.username === username)) {
+              alert('Username already exists');
+              return;
+            }
+            const newUser = {
+              username,
+              password,
+              name,
+              totalHours: 0,
+              entries: []
+            };
+            saveUsers([...users, newUser]);
+            alert('Account created! Please log in.');
+            setLoginMode(true);
+            setUsername('');
+            setPassword('');
+            setName('');
+          };
 
-          <div className="grid md:grid-cols-3 gap-4 mb-6">
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <p className="text-gray-600 mb-2">Total Students</p>
-              <p className="text-3xl font-bold text-purple-600">{users.length}</p>
-            </div>
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <p className="text-gray-600 mb-2">Total Hours Logged</p>
-              <p className="text-3xl font-bold text-purple-600">
-                {users.reduce((sum, u) => sum + u.totalHours, 0)}
-              </p>
-            </div>
-            <div className="bg-white rounded-xl shadow-lg p-6">
-              <p className="text-gray-600 mb-2">Total Entries</p>
-              <p className="text-3xl font-bold text-purple-600">
-                {users.reduce((sum, u) => sum + u.entries.length, 0)}
-              </p>
-            </div>
-          </div>
+          const handleLogin = () => {
+            const user = users.find(u => u.username === username && u.password === password);
+            if (user) {
+              setCurrentUser(user);
+              setUsername('');
+              setPassword('');
+            } else {
+              alert('Invalid username or password');
+            }
+          };
 
-          <div className="bg-white rounded-2xl shadow-xl p-6">
-            <h2 className="text-xl font-bold text-gray-800 mb-4">All Students</h2>
-            <div className="space-y-4">
-              {sortedUsers.map((user, index) => (
-                <div key={user.username} className="border border-gray-200 rounded-xl p-4">
-                  <div className="flex justify-between items-center mb-3">
-                    <div className="flex items-center gap-3">
-                      <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
-                        index === 0 ? 'bg-yellow-400 text-yellow-900' :
-                        index === 1 ? 'bg-gray-300 text-gray-700' :
-                        index === 2 ? 'bg-orange-400 text-orange-900' :
-                        'bg-gray-200 text-gray-600'
-                      }`}>
-                        {index + 1}
+          const handleAddHours = () => {
+            if (hours <= 0) {
+              alert('Please enter valid hours');
+              return;
+            }
+            if (!description) {
+              alert('Please add description');
+              return;
+            }
+
+            const updatedUsers = users.map(u => {
+              if (u.username === currentUser.username) {
+                return {
+                  ...u,
+                  totalHours: u.totalHours + parseFloat(hours),
+                  entries: [...u.entries, {
+                    hours: parseFloat(hours),
+                    description,
+                    date: new Date().toLocaleDateString()
+                  }]
+                };
+              }
+              return u;
+            });
+
+            saveUsers(updatedUsers);
+            setCurrentUser(updatedUsers.find(u => u.username === currentUser.username));
+            setHours(0);
+            setDescription('');
+            alert('Hours added!');
+          };
+
+          const handleDeleteEntry = (entryIndex) => {
+            const entry = currentUser.entries[entryIndex];
+            const updatedUsers = users.map(u => {
+              if (u.username === currentUser.username) {
+                const newEntries = u.entries.filter((_, i) => i !== entryIndex);
+                return {
+                  ...u,
+                  totalHours: u.totalHours - entry.hours,
+                  entries: newEntries
+                };
+              }
+              return u;
+            });
+            saveUsers(updatedUsers);
+            setCurrentUser(updatedUsers.find(u => u.username === currentUser.username));
+          };
+
+          const handleAdminDeleteEntry = (username, entryIndex) => {
+            const user = users.find(u => u.username === username);
+            const entry = user.entries[entryIndex];
+            
+            if (window.confirm(`Delete ${entry.hours} hours from ${user.name}?`)) {
+              const updatedUsers = users.map(u => {
+                if (u.username === username) {
+                  const newEntries = u.entries.filter((_, i) => i !== entryIndex);
+                  return {
+                    ...u,
+                    totalHours: u.totalHours - entry.hours,
+                    entries: newEntries
+                  };
+                }
+                return u;
+              });
+              saveUsers(updatedUsers);
+              alert('Hours removed!');
+            }
+          };
+
+          const sortedUsers = [...users].sort((a, b) => {
+            if (b.totalHours !== a.totalHours) {
+              return b.totalHours - a.totalHours;
+            }
+            return a.name.localeCompare(b.name);
+          });
+
+          if (isAdmin && showAdminPanel) {
+            return (
+              <div className="min-h-screen bg-gradient-to-br from-purple-50 to-pink-100 p-4">
+                <div className="max-w-6xl mx-auto">
+                  <div className="bg-white rounded-2xl shadow-2xl p-6 mb-6">
+                    <div className="flex justify-between items-center flex-wrap gap-4">
+                      <div className="flex items-center gap-3">
+                        <div className="bg-purple-600 p-3 rounded-full">
+                          <Shield className="text-white" size={24} />
+                        </div>
+                        <div>
+                          <h1 className="text-2xl font-bold text-gray-800">Admin Panel</h1>
+                          <p className="text-gray-600">Manage all student hours</p>
+                        </div>
                       </div>
-                      <div>
-                        <h3 className="font-bold text-gray-800">{user.name}</h3>
-                        <p className="text-sm text-gray-600">@{user.username}</p>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-2xl font-bold text-purple-600">{user.totalHours}h</p>
-                      <p className="text-sm text-gray-600">{user.entries.length} entries</p>
+                      <button
+                        onClick={() => {
+                          setShowAdminPanel(false);
+                          setIsAdmin(false);
+                        }}
+                        className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+                      >
+                        <LogOut size={20} />
+                        Exit Admin
+                      </button>
                     </div>
                   </div>
-                  
-                  {selectedUser === user.username ? (
-                    <div className="mt-4 border-t pt-4">
-                      <div className="flex justify-between items-center mb-3">
-                        <h4 className="font-semibold text-gray-700">Hour History</h4>
-                        <button
-                          onClick={() => setSelectedUser(null)}
-                          className="text-sm text-purple-600 hover:text-purple-700"
-                        >
-                          Hide
-                        </button>
-                      </div>
+
+                  <div className="grid md:grid-cols-3 gap-4 mb-6">
+                    <div className="bg-white rounded-xl shadow-lg p-6">
+                      <p className="text-gray-600 mb-2">Total Students</p>
+                      <p className="text-3xl font-bold text-purple-600">{users.length}</p>
+                    </div>
+                    <div className="bg-white rounded-xl shadow-lg p-6">
+                      <p className="text-gray-600 mb-2">Total Hours</p>
+                      <p className="text-3xl font-bold text-purple-600">
+                        {users.reduce((sum, u) => sum + u.totalHours, 0)}
+                      </p>
+                    </div>
+                    <div className="bg-white rounded-xl shadow-lg p-6">
+                      <p className="text-gray-600 mb-2">Total Entries</p>
+                      <p className="text-3xl font-bold text-purple-600">
+                        {users.reduce((sum, u) => sum + u.entries.length, 0)}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-2xl shadow-xl p-6">
+                    <h2 className="text-xl font-bold text-gray-800 mb-4">All Students</h2>
+                    <div className="space-y-4">
+                      {sortedUsers.map((user, index) => (
+                        <div key={user.username} className="border border-gray-200 rounded-xl p-4">
+                          <div className="flex justify-between items-center mb-3 flex-wrap gap-3">
+                            <div className="flex items-center gap-3">
+                              <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
+                                index === 0 ? 'bg-yellow-400 text-yellow-900' :
+                                index === 1 ? 'bg-gray-300 text-gray-700' :
+                                index === 2 ? 'bg-orange-400 text-orange-900' :
+                                'bg-gray-200 text-gray-600'
+                              }`}>
+                                {index + 1}
+                              </div>
+                              <div>
+                                <h3 className="font-bold text-gray-800">{user.name}</h3>
+                                <p className="text-sm text-gray-600">@{user.username}</p>
+                              </div>
+                            </div>
+                            <div className="text-right">
+                              <p className="text-2xl font-bold text-purple-600">{user.totalHours}h</p>
+                              <p className="text-sm text-gray-600">{user.entries.length} entries</p>
+                            </div>
+                          </div>
+                          
+                          {selectedUser === user.username ? (
+                            <div className="mt-4 border-t pt-4">
+                              <div className="flex justify-between items-center mb-3">
+                                <h4 className="font-semibold text-gray-700">Hour History</h4>
+                                <button
+                                  onClick={() => setSelectedUser(null)}
+                                  className="text-sm text-purple-600 hover:text-purple-700"
+                                >
+                                  Hide
+                                </button>
+                              </div>
+                              <div className="space-y-2 max-h-60 overflow-y-auto">
+                                {user.entries.length === 0 ? (
+                                  <p className="text-gray-500 text-center py-4">No hours logged</p>
+                                ) : (
+                                  user.entries.map((entry, idx) => (
+                                    <div key={idx} className="bg-gray-50 p-3 rounded-lg flex justify-between items-start gap-3">
+                                      <div className="flex-1">
+                                        <p className="font-bold text-purple-600">{entry.hours} hours</p>
+                                        <p className="text-sm text-gray-600">{entry.date}</p>
+                                        <p className="text-sm text-gray-700 mt-1">{entry.description}</p>
+                                      </div>
+                                      <button
+                                        onClick={() => handleAdminDeleteEntry(user.username, idx)}
+                                        className="text-red-500 hover:text-red-700 p-2 flex-shrink-0"
+                                      >
+                                        <Trash2 size={18} />
+                                      </button>
+                                    </div>
+                                  ))
+                                )}
+                              </div>
+                            </div>
+                          ) : (
+                            <button
+                              onClick={() => setSelectedUser(user.username)}
+                              className="w-full mt-2 text-purple-600 hover:text-purple-700 text-sm font-semibold"
+                            >
+                              View & Manage Hours →
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            );
+          }
+
+          if (!currentUser) {
+            return (
+              <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
+                <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
+                  <div className="text-center mb-8">
+                    <div className="bg-indigo-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                      <Clock className="text-white" size={32} />
+                    </div>
+                    <h1 className="text-3xl font-bold text-gray-800 mb-2">Volunteer Tracker</h1>
+                    <p className="text-gray-600">Track your community service hours</p>
+                  </div>
+
+                  <div className="flex gap-2 mb-6">
+                    <button
+                      onClick={() => setLoginMode(true)}
+                      className={`flex-1 py-2 rounded-lg font-semibold transition ${
+                        loginMode ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      Login
+                    </button>
+                    <button
+                      onClick={() => setLoginMode(false)}
+                      className={`flex-1 py-2 rounded-lg font-semibold transition ${
+                        !loginMode ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                      }`}
+                    >
+                      Sign Up
+                    </button>
+                  </div>
+
+                  <div className="space-y-4">
+                    {!loginMode && (
+                      <input
+                        type="text"
+                        placeholder="Full Name"
+                        value={name}
+                        onChange={(e) => setName(e.target.value)}
+                        className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                      />
+                    )}
+                    <input
+                      type="text"
+                      placeholder="Username"
+                      value={username}
+                      onChange={(e) => setUsername(e.target.value)}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                    />
+                    <input
+                      type="password"
+                      placeholder="Password"
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                    />
+                    <button
+                      onClick={loginMode ? handleLogin : handleSignup}
+                      className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition"
+                    >
+                      {loginMode ? 'Login' : 'Create Account'}
+                    </button>
+                  </div>
+
+                  <div className="flex gap-2 mt-4">
+                    <button
+                      onClick={() => setShowLeaderboard(!showLeaderboard)}
+                      className="flex-1 text-indigo-600 hover:text-indigo-700 font-semibold flex items-center justify-center gap-2 py-2"
+                    >
+                      <Users size={20} />
+                      Leaderboard
+                    </button>
+                    <button
+                      onClick={() => {
+                        const pwd = prompt('Enter admin password:');
+                        if (pwd === ADMIN_PASSWORD) {
+                          setIsAdmin(true);
+                          setShowAdminPanel(true);
+                        } else if (pwd) {
+                          alert('Incorrect password');
+                        }
+                      }}
+                      className="flex-1 text-purple-600 hover:text-purple-700 font-semibold flex items-center justify-center gap-2 py-2"
+                    >
+                      <Shield size={20} />
+                      Admin
+                    </button>
+                  </div>
+
+                  {showLeaderboard && sortedUsers.length > 0 && (
+                    <div className="mt-6 border-t pt-4">
+                      <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
+                        <Award size={20} className="text-yellow-500" />
+                        Leaderboard
+                      </h3>
                       <div className="space-y-2 max-h-60 overflow-y-auto">
-                        {user.entries.length === 0 ? (
-                          <p className="text-gray-500 text-center py-4">No hours logged</p>
-                        ) : (
-                          user.entries.map((entry, idx) => (
-                            <div key={idx} className="bg-gray-50 p-3 rounded-lg flex justify-between items-start">
+                        {sortedUsers.map((user, index) => (
+                          <div key={user.username} className="flex items-center gap-3 bg-gray-50 p-3 rounded-lg">
+                            <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
+                              index === 0 ? 'bg-yellow-400 text-yellow-900' :
+                              index === 1 ? 'bg-gray-300 text-gray-700' :
+                              index === 2 ? 'bg-orange-400 text-orange-900' :
+                              'bg-gray-200 text-gray-600'
+                            }`}>
+                              {index + 1}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-semibold text-gray-800 truncate">{user.name}</p>
+                            </div>
+                            <div className="text-right">
+                              <p className="font-bold text-indigo-600">{user.totalHours}h</p>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            );
+          }
+
+          return (
+            <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+              <div className="max-w-4xl mx-auto">
+                <div className="bg-white rounded-2xl shadow-2xl p-6 mb-6">
+                  <div className="flex justify-between items-center flex-wrap gap-4">
+                    <div>
+                      <h1 className="text-2xl font-bold text-gray-800">Welcome, {currentUser.name}!</h1>
+                      <p className="text-gray-600">Total Hours: <span className="font-bold text-indigo-600">{currentUser.totalHours}</span></p>
+                    </div>
+                    <button
+                      onClick={() => setCurrentUser(null)}
+                      className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600"
+                    >
+                      <LogOut size={20} />
+                      Logout
+                    </button>
+                  </div>
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-6 mb-6">
+                  <div className="bg-white rounded-2xl shadow-xl p-6">
+                    <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                      <PlusCircle className="text-indigo-600" />
+                      Add Hours
+                    </h2>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">Hours</label>
+                        <input
+                          type="number"
+                          step="0.5"
+                          value={hours}
+                          onChange={(e) => setHours(e.target.value)}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600"
+                          placeholder="Enter hours"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-semibold text-gray-700 mb-2">Description</label>
+                        <textarea
+                          value={description}
+                          onChange={(e) => setDescription(e.target.value)}
+                          className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600 h-24 resize-none"
+                          placeholder="Describe your volunteer work..."
+                        />
+                      </div>
+                      <button
+                        onClick={handleAddHours}
+                        className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition"
+                      >
+                        Add Hours
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="bg-white rounded-2xl shadow-xl p-6">
+                    <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                      <Clock className="text-indigo-600" />
+                      Your History
+                    </h2>
+                    <div className="space-y-3 max-h-80 overflow-y-auto">
+                      {currentUser.entries.length === 0 ? (
+                        <p className="text-gray-500 text-center py-8">No hours logged yet</p>
+                      ) : (
+                        currentUser.entries.map((entry, index) => (
+                          <div key={index} className="bg-gray-50 p-4 rounded-lg">
+                            <div className="flex justify-between items-start mb-2 gap-3">
                               <div className="flex-1">
-                                <p className="font-bold text-purple-600">{entry.hours} hours</p>
+                                <p className="font-bold text-indigo-600">{entry.hours} hours</p>
                                 <p className="text-sm text-gray-600">{entry.date}</p>
-                                <p className="text-sm text-gray-700 mt-1">{entry.description}</p>
                               </div>
                               <button
-                                onClick={() => handleAdminDeleteEntry(user.username, idx)}
-                                className="text-red-500 hover:text-red-700 p-2"
-                                title="Delete this entry"
+                                onClick={() => handleDeleteEntry(index)}
+                                className="text-red-500 hover:text-red-700 p-2 flex-shrink-0"
                               >
                                 <Trash2 size={18} />
                               </button>
                             </div>
-                          ))
-                        )}
-                      </div>
+                            <p className="text-gray-700 text-sm">{entry.description}</p>
+                          </div>
+                        ))
+                      )}
                     </div>
-                  ) : (
-                    <button
-                      onClick={() => setSelectedUser(user.username)}
-                      className="w-full mt-2 text-purple-600 hover:text-purple-700 text-sm font-semibold"
-                    >
-                      View & Manage Hours →
-                    </button>
-                  )}
+                  </div>
                 </div>
-              ))}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
-  if (!currentUser) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
-          <div className="text-center mb-8">
-            <div className="bg-indigo-600 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-              <Clock className="text-white" size={32} />
-            </div>
-            <h1 className="text-3xl font-bold text-gray-800 mb-2">Volunteer Tracker</h1>
-            <p className="text-gray-600">Track your community service hours</p>
-          </div>
-
-          {!isAdmin ? (
-            <>
-              <div className="flex gap-2 mb-6">
-                <button
-                  onClick={() => setLoginMode(true)}
-                  className={`flex-1 py-2 rounded-lg font-semibold transition ${
-                    loginMode
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  Login
-                </button>
-                <button
-                  onClick={() => setLoginMode(false)}
-                  className={`flex-1 py-2 rounded-lg font-semibold transition ${
-                    !loginMode
-                      ? 'bg-indigo-600 text-white'
-                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                  }`}
-                >
-                  Sign Up
-                </button>
-              </div>
-
-              <div className="space-y-4">
-                {!loginMode && (
-                  <input
-                    type="text"
-                    placeholder="Full Name"
-                    value={name}
-                    onChange={(e) => setName(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600"
-                  />
-                )}
-                <input
-                  type="text"
-                  placeholder="Username"
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600"
-                />
-                <input
-                  type="password"
-                  placeholder="Password"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600"
-                />
-                <button
-                  onClick={loginMode ? handleLogin : handleSignup}
-                  className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition"
-                >
-                  {loginMode ? 'Login' : 'Create Account'}
-                </button>
-              </div>
-
-              <div className="flex gap-2 mt-4">
-                <button
-                  onClick={() => setShowLeaderboard(!showLeaderboard)}
-                  className="flex-1 text-indigo-600 hover:text-indigo-700 font-semibold flex items-center justify-center gap-2 py-2"
-                >
-                  <Users size={20} />
-                  Leaderboard
-                </button>
-                <button
-                  onClick={() => {
-                    const pwd = prompt('Enter admin password:');
-                    if (pwd === ADMIN_PASSWORD) {
-                      setIsAdmin(true);
-                      setShowAdminPanel(true);
-                    } else if (pwd) {
-                      alert('Incorrect admin password');
-                    }
-                  }}
-                  className="flex-1 text-purple-600 hover:text-purple-700 font-semibold flex items-center justify-center gap-2 py-2"
-                >
-                  <Shield size={20} />
-                  Admin
-                </button>
-              </div>
-            </>
-          ) : null}
-
-          {showLeaderboard && sortedUsers.length > 0 && (
-            <div className="mt-6 border-t pt-4">
-              <h3 className="font-bold text-gray-800 mb-3 flex items-center gap-2">
-                <Award size={20} className="text-yellow-500" />
-                Leaderboard
-              </h3>
-              <div className="space-y-2 max-h-60 overflow-y-auto">
-                {sortedUsers.map((user, index) => (
-                  <div key={user.username} className="flex items-center gap-3 bg-gray-50 p-3 rounded-lg">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
-                      index === 0 ? 'bg-yellow-400 text-yellow-900' :
-                      index === 1 ? 'bg-gray-300 text-gray-700' :
-                      index === 2 ? 'bg-orange-400 text-orange-900' :
-                      'bg-gray-200 text-gray-600'
-                    }`}>
-                      {index + 1}
-                    </div>
-                    <div className="flex-1">
-                      <p className="font-semibold text-gray-800">{user.name}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="font-bold text-indigo-600">{user.totalHours}h</p>
-                    </div>
+                <div className="bg-white rounded-2xl shadow-xl p-6">
+                  <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
+                    <Award className="text-yellow-500" />
+                    Leaderboard
+                  </h2>
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead className="bg-indigo-50">
+                        <tr>
+                          <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Rank</th>
+                          <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Name</th>
+                          <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">Hours</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-200">
+                        {sortedUsers.map((user, index) => (
+                          <tr key={user.username} className={user.username === currentUser.username ? 'bg-indigo-50' : ''}>
+                            <td className="px-4 py-3">
+                              <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm ${
+                                index === 0 ? 'bg-yellow-400 text-yellow-900' :
+                                index === 1 ? 'bg-gray-300 text-gray-700' :
+                                index === 2 ? 'bg-orange-400 text-orange-900' :
+                                'bg-gray-200 text-gray-600'
+                              }`}>
+                                {index + 1}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 font-semibold text-gray-800">{user.name}</td>
+                            <td className="px-4 py-3 text-right font-bold text-indigo-600">{user.totalHours}h</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
                   </div>
-                ))}
+                </div>
               </div>
             </div>
-          )}
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
-      <div className="max-w-4xl mx-auto">
-        <div className="bg-white rounded-2xl shadow-2xl p-6 mb-6">
-          <div className="flex justify-between items-center">
-            <div>
-              <h1 className="text-2xl font-bold text-gray-800">Welcome, {currentUser.name}!</h1>
-              <p className="text-gray-600">Total Hours: <span className="font-bold text-indigo-600">{currentUser.totalHours}</span></p>
-            </div>
-            <button
-              onClick={() => setCurrentUser(null)}
-              className="flex items-center gap-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition"
-            >
-              <LogOut size={20} />
-              Logout
-            </button>
-          </div>
-        </div>
-
-        <div className="grid md:grid-cols-2 gap-6 mb-6">
-          <div className="bg-white rounded-2xl shadow-xl p-6">
-            <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-              <PlusCircle className="text-indigo-600" />
-              Add Hours
-            </h2>
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Hours</label>
-                <input
-                  type="number"
-                  step="0.5"
-                  value={hours}
-                  onChange={(e) => setHours(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600"
-                  placeholder="Enter hours"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Description</label>
-                <textarea
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-600 h-24"
-                  placeholder="Describe your volunteer work..."
-                />
-              </div>
-              <button
-                onClick={handleAddHours}
-                className="w-full bg-indigo-600 text-white py-3 rounded-lg font-semibold hover:bg-indigo-700 transition"
-              >
-                Add Hours
-              </button>
-            </div>
-          </div>
-
-          <div className="bg-white rounded-2xl shadow-xl p-6">
-            <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-              <Clock className="text-indigo-600" />
-              Your History
-            </h2>
-            <div className="space-y-3 max-h-80 overflow-y-auto">
-              {currentUser.entries.length === 0 ? (
-                <p className="text-gray-500 text-center py-8">No hours logged yet</p>
-              ) : (
-                currentUser.entries.map((entry, index) => (
-                  <div key={index} className="bg-gray-50 p-4 rounded-lg">
-                    <div className="flex justify-between items-start mb-2">
-                      <div className="flex-1">
-                        <p className="font-bold text-indigo-600">{entry.hours} hours</p>
-                        <p className="text-sm text-gray-600">{entry.date}</p>
-                      </div>
-                      <button
-                        onClick={() => handleDeleteEntry(index)}
-                        className="text-red-500 hover:text-red-700 p-2"
-                        title="Delete entry"
-                      >
-                        <Trash2 size={18} />
-                      </button>
-                    </div>
-                    <p className="text-gray-700 text-sm">{entry.description}</p>
-                  </div>
-                ))
-              )}
-            </div>
-          </div>
-        </div>
-
-        <div className="bg-white rounded-2xl shadow-xl p-6">
-          <h2 className="text-xl font-bold text-gray-800 mb-4 flex items-center gap-2">
-            <Award className="text-yellow-500" />
-            Leaderboard
-          </h2>
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead className="bg-indigo-50">
-                <tr>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Rank</th>
-                  <th className="px-4 py-3 text-left text-sm font-semibold text-gray-700">Name</th>
-                  <th className="px-4 py-3 text-right text-sm font-semibold text-gray-700">Hours</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {sortedUsers.map((user, index) => (
-                  <tr key={user.username} className={user.username === currentUser.username ? 'bg-indigo-50' : ''}>
-                    <td className="px-4 py-3">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center font-bold ${
-                        index === 0 ? 'bg-yellow-400 text-yellow-900' :
-                        index === 1 ? 'bg-gray-300 text-gray-700' :
-                        index === 2 ? 'bg-orange-400 text-orange-900' :
-                        'bg-gray-200 text-gray-600'
-                      }`}>
-                        {index + 1}
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 font-semibold text-gray-800">{user.name}</td>
-                    <td className="px-4 py-3 text-right font-bold text-indigo-600">{user.totalHours}h</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+          );
         }
 
         const root = ReactDOM.createRoot(document.getElementById('root'));
         root.render(<VolunteerTracker />);
     </script>
-    
-    <script src="https://unpkg.com/lucide@latest"></script>
 </body>
 </html>
